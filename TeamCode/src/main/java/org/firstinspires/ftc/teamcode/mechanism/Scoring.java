@@ -1,32 +1,40 @@
 package org.firstinspires.ftc.teamcode.mechanism;
 
 import com.acmerobotics.roadrunner.Action;
-import com.acmerobotics.roadrunner.ParallelAction;
 import com.acmerobotics.roadrunner.SequentialAction;
 import com.acmerobotics.roadrunner.ftc.Actions;
+import com.acmerobotics.roadrunner.ftc.Encoder;
+import com.acmerobotics.roadrunner.ftc.OverflowEncoder;
+import com.acmerobotics.roadrunner.ftc.RawEncoder;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.Servo;
 
 import org.firstinspires.ftc.teamcode.algorithms.PID;
 
 public class Scoring {
-    public DcMotorEx linear;
+    public DcMotorEx linear1;
+    public DcMotorEx linear2;
     public Servo elbow;
     public Servo claw;
     public Servo wrist;
+    double elbow_chamber = .15;
+    double elbow_wall = .7;
     PID pid = new PID();
     public Scoring(HardwareMap hardwareMap){
-        linear = hardwareMap.get(DcMotorEx.class, "ln");
-        linear.setDirection(DcMotorEx.Direction.REVERSE);
-        linear.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE);
+        linear1 = hardwareMap.get(DcMotorEx.class, "l1");
+        linear1.setDirection(DcMotorEx.Direction.FORWARD);
+        linear1.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE);
+        linear2 = hardwareMap.get(DcMotorEx.class, "l2");
+        linear2.setDirection(DcMotorEx.Direction.REVERSE);
+        linear2.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE);
         elbow = hardwareMap.get(Servo.class, "el");
-        elbow.setPosition(0.64);
+        elbow.setPosition(0.7);//57
         wrist = hardwareMap.get(Servo.class, "ws");
         wrist.setPosition(0);
         claw = hardwareMap.get(Servo.class, "cl");
-        claw.setPosition(1);
-
+        claw.setPosition(0.95);
     }
     public Action elbowAuto(double position){
         return telemetryPacket -> {
@@ -46,19 +54,29 @@ public class Scoring {
             return false;
         };
     }
-    public Action linearAuto(double target, double power) {
+    public Action linearAuto( final double target, double power) {
         return telemetryPacket -> {
-            double output = pid.PIDControlDistance(target, linear.getCurrentPosition());
-            linear.setPower(output * power);
+            double output = pid.PIDControlDistance(target,((linear1.getCurrentPosition() + linear2.getCurrentPosition()) /2));
+            linear1.setPower(output * power);
+            linear2.setPower(output * power);
             return false;
         };
     }
 
     public Action linearControl(boolean x, boolean y,double power){
         return telemetryPacket ->  {
-            if(x) linear.setPower(power);
-            else if(y) linear.setPower(-power);
-            else linear.setPower(0);
+            if(x) {
+                linear1.setPower(power);
+                linear2.setPower(power);
+            }
+            else if(y) {
+                linear1.setPower(-power);
+                linear2.setPower(-power);
+            }
+            else {
+                linear1.setPower(0);
+                linear2.setPower(0);
+            }
             return false;
         };
     }
@@ -72,10 +90,10 @@ public class Scoring {
     */
     public Action scoringControl(boolean x, boolean y, boolean a, boolean b, boolean c, boolean d){
         return telemetryPacket ->{
-            if(x) Actions.runBlocking(elbowAuto(.2));
-            else if(y) Actions.runBlocking(elbowAuto(0.8));
-            if(a) Actions.runBlocking(clawAuto(0.3));
-            else if(b) Actions.runBlocking(clawAuto(1));
+            if(x) Actions.runBlocking(elbowAuto(elbow_wall));
+            else if(y) Actions.runBlocking(elbowAuto(elbow_chamber));
+            if(a) Actions.runBlocking(clawAuto(0.5));
+            else if(b) Actions.runBlocking(clawAuto(0.8));
             if(c) Actions.runBlocking(wsAuto(1));
             else if(d) Actions.runBlocking(wsAuto(0));
             return false;
